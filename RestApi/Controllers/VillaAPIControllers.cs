@@ -44,5 +44,25 @@ public class VillaApiControllers : ControllerBase
         
     }
 
-    
+    [HttpPost("create")]
+    public ActionResult<VillaDTO> CreateVilla([FromBody]VillaDTO villa)
+    {
+        if (villa == null)
+        {
+            return BadRequest("villa is empty");
+        }
+
+        if (Convert.ToInt32(villa.Id) < 0)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        string currentMaxId = VillaStore.villaStore().OrderByDescending(v => v.Id).First().Id;
+        string newId = Convert.ToString(Convert.ToInt32(currentMaxId) + 1);
+
+        villa.Id = newId;
+        VillaStore.villaStore().Add(villa);
+        
+        return Ok(villa);
+    }
 }
