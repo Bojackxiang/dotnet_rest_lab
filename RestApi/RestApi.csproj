@@ -7,8 +7,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="7.0.20"/>
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="7.0.20"/>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.17"/>
         <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Folder Include="enums\"/>
     </ItemGroup>
 
 </Project>
