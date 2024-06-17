@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using RestApi.data;
+using RestApi.logging;
 using RestApi.Models;
 
 namespace RestApi.Controllers;
@@ -9,9 +10,9 @@ namespace RestApi.Controllers;
 [Route("api/villa-api")]
 public class VillaApiControllers : ControllerBase
 {
-    private readonly ILogger<VillaApiControllers> _logger;
+    private readonly ILogging _logger;
 
-    public VillaApiControllers(ILogger<VillaApiControllers> logger)
+    public VillaApiControllers(ILogging logger)
     {
         _logger = logger;
     }
@@ -25,9 +26,8 @@ public class VillaApiControllers : ControllerBase
     [HttpGet("getById/{id}", Name = "GetById")]
     public ActionResult<VillaDTO> GetVillaById(string id)
     {
-        _logger.LogInformation("get all villa");
-        _logger.LogError("Sample log error");
-        _logger.LogDebug("this is a debug message");
+        _logger.Log("testing for customized logging - error", "Error");
+        _logger.Log("testing for customized logging - info", "Info");
         // if (!int.TryParse(id, out int parsedId))
         // {
         //     return BadRequest("Invalid id");
