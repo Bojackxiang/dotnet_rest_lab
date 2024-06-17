@@ -15,6 +15,7 @@
 
     <ItemGroup>
         <Folder Include="enums\"/>
+        <Folder Include="logging\" />
     </ItemGroup>
 
 </Project>

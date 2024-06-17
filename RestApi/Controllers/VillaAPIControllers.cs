@@ -9,6 +9,13 @@ namespace RestApi.Controllers;
 [Route("api/villa-api")]
 public class VillaApiControllers : ControllerBase
 {
+    private readonly ILogger<VillaApiControllers> _logger;
+
+    public VillaApiControllers(ILogger<VillaApiControllers> logger)
+    {
+        _logger = logger;
+    }
+
     [HttpGet("villas")]
     public ActionResult<List<VillaDTO>> GetVillas()
     {
@@ -18,6 +25,9 @@ public class VillaApiControllers : ControllerBase
     [HttpGet("getById/{id}", Name = "GetById")]
     public ActionResult<VillaDTO> GetVillaById(string id)
     {
+        _logger.LogInformation("get all villa");
+        _logger.LogError("Sample log error");
+        _logger.LogDebug("this is a debug message");
         // if (!int.TryParse(id, out int parsedId))
         // {
         //     return BadRequest("Invalid id");
