@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RestApi.data;
+using RestApi.enums;
 using RestApi.logging;
 using RestApi.Models;
 
@@ -10,18 +12,23 @@ namespace RestApi.Controllers;
 [Route("api/villa-api")]
 public class VillaApiControllers : ControllerBase
 {
+    private readonly ApplicationDbContext _db;
     private readonly ILogging _logger;
 
-    public VillaApiControllers(ILogging logger)
+    public VillaApiControllers(ILogging logger, ApplicationDbContext db)
     {
         _logger = logger;
+        _db = db;
     }
 
     [HttpGet("villas")]
     public ActionResult<List<VillaDTO>> GetVillas()
     {
-        return Ok(VillaStore.villaStore());
+        var villas = _db.Villa.ToList();
+        return Ok(villas);
+        // return Ok(VillaStore.villaStore());
     }
+
 
     [HttpGet("getById/{id}", Name = "GetById")]
     public ActionResult<VillaDTO> GetVillaById(string id)
@@ -44,12 +51,14 @@ public class VillaApiControllers : ControllerBase
             return BadRequest("Invalid parameter: " + e.Message);
         }
 
-        var foundVilla = VillaStore.villaStore().Find(v => v.Id == id);
+        // var foundVilla = VillaStore.villaStore().Find(v => v.Id == id);
+        var foundVilla = _db.Villa.FirstOrDefault(v => v.Id == id);
 
         if (foundVilla != null) return Ok(foundVilla);
 
         return NotFound();
     }
+
 
     [HttpPost("create")]
     public ActionResult<VillaDTO> CreateVilla([FromBody] VillaDTO villa)
@@ -58,11 +67,13 @@ public class VillaApiControllers : ControllerBase
         // {
         //     return BadRequest(ModelState);
         // }
-        var isExistingname = VillaStore.villaStore()
-                                 .FirstOrDefault(v => v.Name.ToLower() == villa.Name)
-                             == null;
+        // var isExistingname = VillaStore.villaStore()
+        //                          .FirstOrDefault(v => v.Name.ToLower() == villa.Name)
+        //                      == null;
 
-        if (isExistingname)
+        var isAvailableName = _db.Villa.FirstOrDefault(v => v.Name == villa.Name) == null;
+
+        if (!isAvailableName)
         {
             ModelState.AddModelError("CustomerError", "Villa name already existed");
 
@@ -74,31 +85,43 @@ public class VillaApiControllers : ControllerBase
 
         if (Convert.ToInt32(villa.Id) < 0) return StatusCode(StatusCodes.Status403Forbidden);
 
-        var currentMaxId = VillaStore.villaStore().OrderByDescending(v => v.Id).First().Id;
-        var newId = Convert.ToString(Convert.ToInt32(currentMaxId) + 1);
+        // var currentMaxId = VillaStore.villaStore().OrderByDescending(v => v.Id).First().Id;
+        // var newId = Convert.ToString(Convert.ToInt32(currentMaxId) + 1);
 
-        villa.Id = newId;
-        VillaStore.villaStore().Add(villa);
+        // VillaStore.villaStore().Add(villa);
+
+        _db.Villa.Add(villa);
+        _db.SaveChanges();
+
 
         // return Ok(villa);
         // change will appear in the header
-        return CreatedAtRoute("GetById", new { Id = newId }, villa);
+        return CreatedAtRoute("GetById", new { villa.Id }, villa);
     }
+
 
     [HttpDelete("delete/{id}")]
     public IActionResult DeleteVillaById(string id)
     {
         var villas = VillaStore.villaStore();
 
-        var foundVilla = VillaStore.villaStore().FirstOrDefault(v => v.Id == id);
+        // var foundVilla = VillaStore.villaStore().FirstOrDefault(v => v.Id == id);
+        var foundVilla = _db.Villa.FirstOrDefault(v => v.Id == id);
 
-        VillaStore.villaStore().Remove(foundVilla);
+        if (foundVilla is not null)
+        {
+            // VillaStore.villaStore().Remove(foundVilla);
+            _db.Villa.Remove(foundVilla);
+            _db.SaveChanges();
+        }
+
 
         return NoContent();
 
 
         return Ok("Deleted successfully");
     }
+
 
     [HttpPut("updateById/{id}")]
     public IActionResult UpdateVillaById(string id, [FromBody] VillaDTO villa)
@@ -109,33 +132,55 @@ public class VillaApiControllers : ControllerBase
             return BadRequest();
         }
 
-        var list = VillaStore.villaStore();
-        var foundVilla = list.FirstOrDefault(v => v.Id == id);
+        // var list = VillaStore.villaStore();
+        // var foundVilla = list.FirstOrDefault(v => v.Id == id);
+        // if (foundVilla == null) return NotFound();
+        // foundVilla.Name = villa.Name;
+
+        var foundVilla = _db.Villa.FirstOrDefault(v => v.Id == id);
         if (foundVilla == null) return NotFound();
-        foundVilla.Name = villa.Name;
 
-        foreach (var villaq in list) Console.WriteLine("{0}", villaq.Name);
 
+        _db.Villa.Update(villa);
+        _db.SaveChanges();
+
+
+        // foreach (var villaq in list) Console.WriteLine("{0}", villaq.Name);
         return NoContent();
     }
 
+
     [HttpPatch("patchById/{id}")]
-    public IActionResult PatchDataById(string id, JsonPatchDocument<VillaDTO> patchDocument)
+    public IActionResult PatchDataById(string id, [FromBody] JsonPatchDocument<VillaDTO> villaJson)
     {
+        Console.WriteLine("{0}", villaJson.Operations);
         if (id == null)
         {
             ModelState.AddModelError(ModelError.CUSTOM_ERROR, "Id is invalid");
             return BadRequest(ModelState);
         }
 
-        var foundVilla = VillaStore.villaStore().FirstOrDefault(v => v.Id == id);
+        var foundVilla = _db.Villa.AsNoTracking().FirstOrDefault(v => v.Id == id);
         if (foundVilla == null) return NotFound("CustomError: villa is not found");
 
-        patchDocument.ApplyTo(foundVilla);
-        if (!ModelState.IsValid)
+        // ..
+        var villaToPatch = new VillaDTO
         {
-            return BadRequest(ModelState);
-        }
+            Id = foundVilla.Id,
+            Name = foundVilla.Name,
+            Age = foundVilla.Age
+        };
+
+        // .. 
+        villaJson.ApplyTo(villaToPatch, ModelState);
+
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        Console.WriteLine("{0} - {1} - {2}", villaToPatch.Name, villaToPatch.Age, villaToPatch.Id);
+
+        _db.Villa.Update(villaToPatch);
+        _db.SaveChanges();
+
 
         return Ok();
     }

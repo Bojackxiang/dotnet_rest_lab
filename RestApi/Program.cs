@@ -1,5 +1,7 @@
 // using Serilog;
 
+using Microsoft.EntityFrameworkCore;
+using RestApi.enums;
 using RestApi.logging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +20,10 @@ builder.Services
 //     .CreateLogger();
 
 // builder.Host.UseSerilog();
+builder.Services.AddDbContext<ApplicationDbContext>(optiton =>
+{
+    optiton.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSQLConnection"));
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
