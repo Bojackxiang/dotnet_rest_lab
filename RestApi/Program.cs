@@ -1,8 +1,10 @@
 // using Serilog;
 
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using RestApi.enums;
 using RestApi.logging;
+using RestApi.Mapper;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +22,11 @@ builder.Services
 //     .CreateLogger();
 
 // builder.Host.UseSerilog();
+
+// mapper config
+builder.Services.AddAutoMapper(typeof(MappingConfig));
+
+// db config
 builder.Services.AddDbContext<ApplicationDbContext>(optiton =>
 {
     optiton.UseSqlServer(builder.Configuration.GetConnectionString("DefaultSQLConnection"));

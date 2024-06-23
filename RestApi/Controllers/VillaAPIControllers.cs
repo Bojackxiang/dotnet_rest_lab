@@ -1,3 +1,4 @@
+using AutoMapper;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,24 +15,28 @@ public class VillaApiControllers : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogging _logger;
+    private readonly IMapper _mapper;
 
-    public VillaApiControllers(ILogging logger, ApplicationDbContext db)
+    public VillaApiControllers(ILogging logger, ApplicationDbContext db, IMapper mapper)
     {
         _logger = logger;
         _db = db;
+        _mapper = mapper;
     }
 
     [HttpGet("villas")]
-    public ActionResult<List<VillaDTO>> GetVillas()
+    public async Task<ActionResult<List<VillaDTO>>> GetVillas()
     {
-        var villas = _db.Villa.ToList();
-        return Ok(villas);
+        IEnumerable<VillaDTO> villas = await _db.Villa.ToListAsync();
+        // return Ok(villas);
         // return Ok(VillaStore.villaStore());
+
+        return Ok(_mapper.Map<List<VillaResponse>>(villas));
     }
 
 
     [HttpGet("getById/{id}", Name = "GetById")]
-    public ActionResult<VillaDTO> GetVillaById(string id)
+    public async Task<ActionResult<VillaDTO>> GetVillaById(string id)
     {
         _logger.Log("testing for customized logging - error", "Error");
         _logger.Log("testing for customized logging - info", "Info");
@@ -52,16 +57,16 @@ public class VillaApiControllers : ControllerBase
         }
 
         // var foundVilla = VillaStore.villaStore().Find(v => v.Id == id);
-        var foundVilla = _db.Villa.FirstOrDefault(v => v.Id == id);
+        var foundVilla = await _db.Villa.FirstOrDefaultAsync(v => v.Id == id);
 
-        if (foundVilla != null) return Ok(foundVilla);
+        if (foundVilla != null) return Ok(_mapper.Map<VillaResponse>(foundVilla));
 
         return NotFound();
     }
 
 
     [HttpPost("create")]
-    public ActionResult<VillaDTO> CreateVilla([FromBody] VillaDTO villa)
+    public async Task<ActionResult<VillaDTO>> CreateVilla([FromBody] VillaCreateDTO villa)
     {
         // if (!ModelState.IsValid)
         // {
@@ -71,7 +76,7 @@ public class VillaApiControllers : ControllerBase
         //                          .FirstOrDefault(v => v.Name.ToLower() == villa.Name)
         //                      == null;
 
-        var isAvailableName = _db.Villa.FirstOrDefault(v => v.Name == villa.Name) == null;
+        var isAvailableName = await _db.Villa.FirstOrDefaultAsync(v => v.Name == villa.Name) == null;
 
         if (!isAvailableName)
         {
@@ -83,36 +88,42 @@ public class VillaApiControllers : ControllerBase
 
         if (villa == null) return BadRequest("villa is empty");
 
-        if (Convert.ToInt32(villa.Id) < 0) return StatusCode(StatusCodes.Status403Forbidden);
+        // if (Convert.ToInt32(villa.Id) < 0) return StatusCode(StatusCodes.Status403Forbidden);
 
         // var currentMaxId = VillaStore.villaStore().OrderByDescending(v => v.Id).First().Id;
         // var newId = Convert.ToString(Convert.ToInt32(currentMaxId) + 1);
 
         // VillaStore.villaStore().Add(villa);
 
-        _db.Villa.Add(villa);
-        _db.SaveChanges();
+        VillaDTO createVilla = new()
+        {
+            Name = villa.Name,
+            Age = villa.Age
+        };
+
+        await _db.Villa.AddAsync(createVilla);
+        await _db.SaveChangesAsync();
 
 
         // return Ok(villa);
         // change will appear in the header
-        return CreatedAtRoute("GetById", new { villa.Id }, villa);
+        return CreatedAtRoute("GetById", new { createVilla.Id }, villa);
     }
 
 
     [HttpDelete("delete/{id}")]
-    public IActionResult DeleteVillaById(string id)
+    public async Task<IActionResult> DeleteVillaById(string id)
     {
         var villas = VillaStore.villaStore();
 
         // var foundVilla = VillaStore.villaStore().FirstOrDefault(v => v.Id == id);
-        var foundVilla = _db.Villa.FirstOrDefault(v => v.Id == id);
+        var foundVilla = await _db.Villa.FirstOrDefaultAsync(v => v.Id == id);
 
         if (foundVilla is not null)
         {
             // VillaStore.villaStore().Remove(foundVilla);
             _db.Villa.Remove(foundVilla);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
         }
 
 
@@ -124,12 +135,12 @@ public class VillaApiControllers : ControllerBase
 
 
     [HttpPut("updateById/{id}")]
-    public IActionResult UpdateVillaById(string id, [FromBody] VillaDTO villa)
+    public async Task<IActionResult> UpdateVillaById(string id, [FromBody] VillaUpdateDto villa)
     {
-        if (villa.Id == null || villa.Name == null)
+        if (string.IsNullOrEmpty(id))
         {
-            ModelState.AddModelError("CustomError", "Input of the villa is invalid");
-            return BadRequest();
+            ModelState.AddModelError("CustomError", "Param id should not be empty");
+            return BadRequest(ModelState);
         }
 
         // var list = VillaStore.villaStore();
@@ -137,12 +148,19 @@ public class VillaApiControllers : ControllerBase
         // if (foundVilla == null) return NotFound();
         // foundVilla.Name = villa.Name;
 
-        var foundVilla = _db.Villa.FirstOrDefault(v => v.Id == id);
+        var foundVilla = await _db.Villa.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id);
         if (foundVilla == null) return NotFound();
 
+        // convert
+        VillaDTO updatedVillaDto = new()
+        {
+            Id = id,
+            Name = villa.Name,
+            Age = villa.Age
+        };
 
-        _db.Villa.Update(villa);
-        _db.SaveChanges();
+        _db.Villa.Update(updatedVillaDto);
+        await _db.SaveChangesAsync();
 
 
         // foreach (var villaq in list) Console.WriteLine("{0}", villaq.Name);
@@ -151,7 +169,7 @@ public class VillaApiControllers : ControllerBase
 
 
     [HttpPatch("patchById/{id}")]
-    public IActionResult PatchDataById(string id, [FromBody] JsonPatchDocument<VillaDTO> villaJson)
+    public async Task<IActionResult> PatchDataById(string id, [FromBody] JsonPatchDocument<VillaDTO> villaJson)
     {
         Console.WriteLine("{0}", villaJson.Operations);
         if (id == null)
@@ -160,7 +178,7 @@ public class VillaApiControllers : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var foundVilla = _db.Villa.AsNoTracking().FirstOrDefault(v => v.Id == id);
+        var foundVilla = await _db.Villa.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id);
         if (foundVilla == null) return NotFound("CustomError: villa is not found");
 
         // ..
@@ -179,7 +197,7 @@ public class VillaApiControllers : ControllerBase
         Console.WriteLine("{0} - {1} - {2}", villaToPatch.Name, villaToPatch.Age, villaToPatch.Id);
 
         _db.Villa.Update(villaToPatch);
-        _db.SaveChanges();
+        await _db.SaveChangesAsync();
 
 
         return Ok();
